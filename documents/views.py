@@ -8,6 +8,9 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 from .utils import get_rate_to_aed, calculate_duties_from_hs
+from rest_framework import views, permissions, status
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 
 User = get_user_model()
 
@@ -211,3 +214,29 @@ class ToggleDarkModeView(views.APIView):
         pref.dark_mode = not pref.dark_mode
         pref.save()
         return Response({'dark_mode': pref.dark_mode})
+
+
+
+class TriggerExtractionView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        doc = get_object_or_404(TradeDocument, pk=pk)
+        # permission check - adjust to your roles/permissions logic
+        if request.user != doc.uploader and not getattr(request.user, 'is_staff', False):
+            return Response({'detail': 'Not permitted'}, status=status.HTTP_403_FORBIDDEN)
+
+        enqueued = []
+        for f in doc.files.all():
+            f.extraction_status = DocumentFile.STATUS_PENDING
+            f.extracted_text = ''
+            f.save(update_fields=['extraction_status', 'extracted_text'])
+            extract_text_and_parse_task.delay(f.id)
+            enqueued.append(f.field_name)
+
+        try:
+            AuditLog.objects.create(user=request.user, action='trigger_extraction', details={'doc_id': doc.id, 'fields': enqueued})
+        except Exception:
+            pass
+
+        return Response({'detail': 'Extraction enqueued', 'fields': enqueued}, status=status.HTTP_202_ACCEPTED)
