@@ -101,3 +101,46 @@ class UserActivityLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     action = models.CharField(max_length=255)
     timestamp = models.DateTimeField(default=timezone.now)
+
+
+
+# backend/documents/models.py (snippet - DocumentFile model replaceme
+
+# ... ensure TradeDocument, ValidationResult, AuditLog models stay unchanged above this model ...
+
+class DocumentFile(models.Model):
+    """
+    Represents a file uploaded for a specific sub-field of a TradeDocument.
+    extraction_status: pending/running/done/failed
+    extracted_text: full text extracted by OCR/text-extraction
+    """
+    STATUS_PENDING = 'pending'
+    STATUS_RUNNING = 'running'
+    STATUS_DONE = 'done'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_RUNNING, 'Running'),
+        (STATUS_DONE, 'Done'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    document = models.ForeignKey('TradeDocument', on_delete=models.CASCADE, related_name='files')
+    field_name = models.CharField(max_length=128)  # e.g. 'hs_code', 'goods_description'
+    file = models.FileField(upload_to='documents/%Y/%m/%d/')
+    uploaded_at = models.DateTimeField(default=timezone.now)
+
+    extraction_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    extracted_text = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('document', 'field_name')
+
+    def __str__(self):
+        return f"File for {self.field_name} of doc {self.document_id}"
+
+    def get_text_snippet(self, length=400):
+        if not self.extracted_text:
+            return ''
+        txt = self.extracted_text.strip().replace('\n', ' ')
+        return txt[:length] + ('...' if len(txt) > length else '')
