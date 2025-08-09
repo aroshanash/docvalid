@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import DocumentUploadView, DocumentListView, DocumentDetailView, ApproveRejectView, RunValidationView, CommentCreateView, CommentListView, CurrencyConvertView, DocumentStatsView, UserPreferenceView, ToggleDarkModeView
-
+from .views import DocumentUploadView, DocumentListView, DocumentDetailView, ApproveRejectView, RunValidationView, CommentCreateView, CommentListView, CurrencyConvertView, DocumentStatsView, UserPreferenceView, ToggleDarkModeView,
+TriggerExtractionView,RunValidationView
 urlpatterns = [
     path('upload/', DocumentUploadView.as_view(), name='documents-upload'),
     path('', DocumentListView.as_view(), name='documents-list'),
@@ -13,4 +13,6 @@ urlpatterns = [
     path('document-stats/', DocumentStatsView.as_view(), name='document-stats'),
     path('user/preferences/', UserPreferenceView.as_view(), name='user-preferences'),
     path('user/preferences/toggle-dark-mode/', ToggleDarkModeView.as_view(), name='user-preferences-toggle-dark'),
+    path('<int:pk>/extract/', views.TriggerExtractionView.as_view(), name='documents-extract'),
+    path('<int:pk>/validate/', views.RunValidationView.as_view(), name='documents-validate'),
 ]
