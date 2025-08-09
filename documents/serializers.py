@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import TradeDocument, DocumentFile, ValidationRule, ValidationResult, Comment, CurrencyRate, AuditLog, UserPreference
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 
 class DocumentFileSerializer(serializers.ModelSerializer):
@@ -79,3 +80,37 @@ class UserPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreference
         fields = ('dark_mode','email_notifications')
+
+
+class DocumentFileSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    extracted_text_snippet = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentFile
+        fields = ('id', 'field_name', 'file', 'file_url', 'uploaded_at', 'extraction_status', 'extracted_text', 'extracted_text_snippet')
+        read_only_fields = ('id', 'file_url', 'uploaded_at', 'extraction_status', 'extracted_text', 'extracted_text_snippet')
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file:
+            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+        return None
+
+    def get_extracted_text_snippet(self, obj):
+        return obj.get_text_snippet()
+
+# Example TradeDocument detail serializer (adjust/merge with your existing)
+class TradeDocumentDetailSerializer(serializers.ModelSerializer):
+    uploader = serializers.StringRelatedField()
+    files = DocumentFileSerializer(many=True, read_only=True)
+    comments = serializers.SerializerMethodField()
+    last_validation = serializers.JSONField(read_only=True)
+    metadata = serializers.JSONField(read_only=True)
+
+    class Meta:
+        model = TradeDocument
+        fields = ('id','doc_type','uploader','status','created_at','updated_at','assigned_reviewer','files','comments','last_validation','metadata')
+
+    def get_comments(self, obj):
+        return [{'user': c.user.username, 'text': c.text, 'created_at': c.created_at} for c in obj.comments.all().order_by('-created_at')]
